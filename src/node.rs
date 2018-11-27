@@ -1,10 +1,24 @@
 use ress;
 
-#[derive(PartialEq, Debug)]
-pub struct Node {
-    pub position: Position,
-    pub item: Item,
+#[derive(PartialEq, Debug, Clone)]
+pub struct SourceLocation {
+    /// An identifier for this source
+    /// i.e. a file path, url, or other identifier
+    source: Option<String>,
+    start: Position,
+    end: Position,
 }
+
+impl SourceLocation {
+    pub fn no_source(start: Position, end: Position) -> Self {
+        Self {
+            source: None,
+            start,
+            end,
+        }
+    }
+}
+
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub struct Position {
     pub line: usize,
@@ -21,37 +35,38 @@ impl Position {
     pub fn start() -> Self {
         Self { line: 0, column: 0 }
     }
+    pub fn new(line: usize, column: usize) -> Self {
+        Self { line, column, }
+    }
 }
 
-#[derive(PartialEq, Debug)]
-pub enum Item {
-    Program(Program),
-    Function(Function),
-    Statement(Statement),
-    SwitchCase(SwitchCase),
-    CatchClause(CatchClause),
-    VariableDecl(VariableDecl),
-    ModuleDecl(ModuleDecl),
-    Expr(Expression),
-    Property(Property),
-    Pattern(Pattern),
-    Super,
-    Class(Class),
+#[derive(PartialEq, Debug, Clone)]
+pub struct Program {
+    source_type: SourceType,
+    body: Vec<ProgramPart>,
+    loc: SourceLocation,
 }
-
-#[derive(PartialEq, Debug)]
-pub enum Program {
-    Module(Vec<ProgramPart>),
-    Script(Vec<ProgramPart>),
+#[derive(PartialEq, Debug, Clone, Copy)]
+pub enum SourceType {
+    Script,
+    Module
 }
 
 impl Program {
-    pub fn module(parts: Vec<ProgramPart>) -> Self {
-        Program::Module(parts)
+    pub fn module(parts: Vec<ProgramPart>, loc: SourceLocation) -> Self {
+        Program {
+            source_type: SourceType::Module,
+            body: parts,
+            loc,
+        }
     }
 
-    pub fn script(parts: Vec<ProgramPart>) -> Self {
-        Program::Script(parts)
+    pub fn script(parts: Vec<ProgramPart>, loc: SourceLocation) -> Self {
+        Program {
+            source_type: SourceType::Script,
+            body: parts,
+            loc
+        }
     }
 }
 

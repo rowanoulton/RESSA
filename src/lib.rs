@@ -58,6 +58,11 @@ mod error;
 pub mod node;
 
 pub use comment_handler::CommentHandler;
+use node::{
+    Program,
+    ProgramPart,
+    SourceLocation,
+};
 use comment_handler::DefaultCommentHandler;
 use error::Error;
 use node::Position;
@@ -465,7 +470,7 @@ where
     /// fn main() {
     ///     let js = "function helloWorld() { alert('Hello world'); }";
     ///     let mut p = Parser::new(&js).unwrap();
-    ///     let expectation = Program::Script(vec![
+    ///     let expectation = Program::script(vec![
     ///         ProgramPart::decl(
     ///         Declaration::Function(
     ///             Function {
@@ -483,12 +488,13 @@ where
     ///             }
     ///         )
     ///     )
-    ///     ]);
+    ///     ], SourceLocation::no_source(Position::new(1, 0), Position::new(1, js.len())));
     ///     let program = p.parse().unwrap();
     ///     assert_eq!(program, expectation);
     /// }
     /// ```
-    pub fn parse(&mut self) -> Res<node::Program> {
+    pub fn parse(&mut self) -> Res<Program> {
+        let start = self.current_position;
         debug!(target: "resp:debug", "parse_script {}", self.context.allow_yield);
         let mut body = vec![];
         while let Some(part) = self.next() {
@@ -497,15 +503,16 @@ where
                 Err(e) => return Err(e),
             }
         }
-        Ok(if self.context.is_module {
-            node::Program::Module(body)
+        let program = if self.context.is_module {
+            Program::module(body, SourceLocation::no_source(start, self.current_position))
         } else {
-            node::Program::Script(body)
-        })
+            Program::script(body, SourceLocation::no_source(start, self.current_position))
+        };
+        Ok(program)
     }
     /// Parse all of the directives into a single prologue
-    fn parse_directive_prologues(&mut self) -> Res<Vec<node::ProgramPart>> {
-        debug!(target: "resp:debug", "parse_directive_prologues {}", self.context.allow_yield);
+    fn parse_directive_prologues(&mut self) -> Res<Vec<ProgramPart>> {
+        debug!(target: "resp:debug", "parse_directive_prologues");
         let mut ret = vec![];
         loop {
             if !self.look_ahead.token.is_string() {
@@ -3892,13 +3899,12 @@ where
         loop {
             self.context.has_line_term = self.scanner.pending_new_line;
             if let Some(look_ahead) = self.scanner.next() {
+                self.current_position = self.get_item_position(&look_ahead);
                 self._look_ahead = format!("{:?}", look_ahead.token);
                 if look_ahead.token.is_comment() {
                     self.comment_handler.handle_comment(look_ahead);
                     continue;
                 }
-                let old_pos = self.get_item_position(&self.look_ahead);
-                self.current_position = old_pos;
                 let ret = replace(&mut self.look_ahead, look_ahead);
                 return Ok(ret);
             } else {
@@ -4210,9 +4216,10 @@ impl<CH> Iterator for Parser<CH>
 where
     CH: CommentHandler + Sized,
 {
-    type Item = Res<node::ProgramPart>;
+    type Item = Res<ProgramPart>;
     fn next(&mut self) -> Option<Self::Item> {
         if self.look_ahead.token.is_eof() {
+            let _ = self.next_item();
             None
         } else {
             Some(self.next_part())
