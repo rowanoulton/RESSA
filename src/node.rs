@@ -138,17 +138,17 @@ impl ModuleDecl {
         })
     }
 
-    pub fn single_import(name: &str, from: &str, loc: SourceLocation) -> Self {
-        Self::simple_imports(&[name], from, loc)
+    pub fn single_import(name: Identifier, from: &str, loc: SourceLocation) -> Self {
+        Self::simple_imports(vec![name], from, loc)
     }
 
-    pub fn single_default_import(name: &str, from: &str, loc: SourceLocation) -> Self {
+    pub fn single_default_import(name: Identifier, from: &str, loc: SourceLocation) -> Self {
         let specifiers = vec![ImportSpecifier::default(name)];
         let source = Literal::string(from);
         ModuleDecl::Import(ModuleImport::new(specifiers, source, loc))
     }
 
-    pub fn imports_with_default(default: &str, normal: &[&str], from: &str, loc: SourceLocation) -> Self {
+    pub fn imports_with_default(default: Identifier, normal: Vec<Identifier>, from: &str, loc: SourceLocation) -> Self {
         let mut specifiers = Vec::with_capacity(normal.len() + 1);
         specifiers.push(ImportSpecifier::default(default));
         for name in normal {
@@ -158,16 +158,16 @@ impl ModuleDecl {
         ModuleDecl::Import(ModuleImport::new(specifiers, source, loc))
     }
 
-    pub fn simple_imports(names: &[&str], from: &str, loc: SourceLocation) -> Self {
+    pub fn simple_imports(names: Vec<Identifier>, from: &str, loc: SourceLocation) -> Self {
         let specifiers = names
-            .iter()
+            .into_iter()
             .map(|n| ImportSpecifier::normal_no_local(n))
             .collect();
         let source = Literal::string(from);
         ModuleDecl::Import(ModuleImport::new(specifiers, source, loc))
     }
 
-    pub fn namespace_import(local: &str, from: &str, loc: SourceLocation) -> Self {
+    pub fn namespace_import(local: Identifier, from: &str, loc: SourceLocation) -> Self {
         ModuleDecl::Import(ModuleImport::new(
             vec![ImportSpecifier::namespace(local)],
             Literal::string(from),
@@ -195,14 +195,14 @@ impl ModuleDecl {
         ModuleDecl::Export(ModuleExport::Named(NamedExportDecl::Decl(decl)))
     }
 
-    pub fn export_single_named_spec(name: &str) -> Self {
+    pub fn export_single_named_spec(name: Identifier) -> Self {
         ModuleDecl::Export(ModuleExport::Named(NamedExportDecl::Specifier(
             vec![ExportSpecifier::no_alias(name)],
             None,
         )))
     }
 
-    pub fn export_single_named_spec_with_alias(name: &str, alias: &str) -> Self {
+    pub fn export_single_named_spec_with_alias(name: Identifier, alias: Identifier) -> Self {
         ModuleDecl::Export(ModuleExport::Named(NamedExportDecl::Specifier(
             vec![ExportSpecifier::with_alias(name, alias)],
             None,
@@ -235,20 +235,20 @@ impl ImportSpecifier {
         ImportSpecifier::Normal(ident, local)
     }
 
-    pub fn normal_no_local(ident: &str) -> Self {
-        ImportSpecifier::Normal(ident.to_string(), None)
+    pub fn normal_no_local(ident: Identifier) -> Self {
+        ImportSpecifier::Normal(ident, None)
     }
 
-    pub fn normal_local(ident: &str, local: &str) -> Self {
-        ImportSpecifier::Normal(ident.to_string(), Some(local.to_string()))
+    pub fn normal_local(ident: Identifier, local: Identifier) -> Self {
+        ImportSpecifier::Normal(ident, Some(local))
     }
 
-    pub fn default(ident: &str) -> Self {
-        ImportSpecifier::Default(ident.to_string())
+    pub fn default(ident: Identifier) -> Self {
+        ImportSpecifier::Default(ident)
     }
 
-    pub fn namespace(ident: &str) -> Self {
-        ImportSpecifier::Namespace(ident.to_string())
+    pub fn namespace(ident: Identifier) -> Self {
+        ImportSpecifier::Namespace(ident)
     }
 }
 
@@ -295,17 +295,17 @@ pub struct ExportSpecifier {
 }
 
 impl ExportSpecifier {
-    pub fn no_alias(local: &str) -> Self {
+    pub fn no_alias(local: Identifier) -> Self {
         Self {
-            local: local.to_string(),
+            local,
             exported: None,
         }
     }
 
-    pub fn with_alias(local: &str, alias: &str) -> Self {
+    pub fn with_alias(local: Identifier, alias: Identifier) -> Self {
         Self {
-            local: local.to_string(),
-            exported: Some(alias.to_string()),
+            local,
+            exported: Some(alias),
         }
     }
 }
@@ -334,27 +334,27 @@ impl VariableDecl {
         self.id.is_obj()
     }
 
-    pub fn uninitialized(name: &str) -> Self {
+    pub fn uninitialized(name: &str, loc: SourceLocation) -> Self {
         Self {
-            id: Pattern::ident(name),
+            id: Pattern::ident(name, loc),
             init: None,
         }
     }
 
-    pub fn with_value(name: &str, value: Expression) -> Self {
+    pub fn with_value(name: Identifier, value: Expression) -> Self {
         Self {
-            id: Pattern::ident(name),
+            id: Pattern::Identifier(name),
             init: Some(value),
         }
     }
 
-    pub fn destructed(names: &[&str], value: ObjectExpression) -> Self {
+    pub fn destructed(names: Vec<Identifier>, value: ObjectExpression) -> Self {
         let id = Pattern::Object(
             names
-                .iter()
+                .into_iter()
                 .map(|name| {
                     ObjectPatternPart::Assignment(Property {
-                        key: PropertyKey::Ident(name.to_string()),
+                        key: PropertyKey::Ident(name),
                         value: PropertyValue::None,
                         kind: PropertyKind::Init,
                         method: false,
@@ -369,12 +369,12 @@ impl VariableDecl {
         }
     }
 
-    pub fn destructed_with_rest(names: &[&str], rest: &str, value: ObjectExpression) -> Self {
+    pub fn destructed_with_rest(names: Vec<Identifier>, rest: Identifier, value: ObjectExpression) -> Self {
         let mut props: Vec<ObjectPatternPart> = names
-            .iter()
+            .into_iter()
             .map(|name| {
                 ObjectPatternPart::Assignment(Property {
-                    key: PropertyKey::Ident(name.to_string()),
+                    key: PropertyKey::Ident(name),
                     value: PropertyValue::None,
                     kind: PropertyKind::Init,
                     computed: false,
@@ -383,7 +383,7 @@ impl VariableDecl {
                 })
             }).collect();
         props.push(ObjectPatternPart::Rest(Box::new(Pattern::RestElement(
-            Box::new(Pattern::ident(rest)),
+            Box::new(Pattern::Identifier(rest)),
         ))));
         let id = Pattern::Object(props);
         let init = Some(Expression::Object(value));
@@ -465,9 +465,9 @@ pub struct LabeledStatement {
 }
 
 impl LabeledStatement {
-    pub fn new(label: &str, body: Statement) -> Self {
+    pub fn new(label: Identifier, body: Statement) -> Self {
         Self {
-            label: label.to_string(),
+            label,
             body: Box::new(body),
         }
     }
@@ -622,11 +622,24 @@ pub enum LoopLeft {
     Variable(VariableDecl),
     Pattern(Pattern),
 }
-pub type Identifier = String;
+#[derive(PartialEq, Debug, Clone)]
+pub struct Identifier {
+    pub name: String,
+    pub loc: SourceLocation,
+}
+
+impl Identifier {
+    pub fn new(name: &str, loc: SourceLocation) -> Self {
+        Self {
+            name: name.to_string(),
+            loc,
+        }
+    }
+}
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct Function {
-    pub id: Option<String>,
+    pub id: Option<Identifier>,
     pub params: Vec<FunctionArg>,
     pub body: FunctionBody,
     pub generator: bool,
@@ -668,11 +681,11 @@ impl FunctionArg {
     pub fn is_await(&self) -> bool {
         match self {
             FunctionArg::Expr(ref e) => match e {
-                Expression::Ident(ref i) => i == "await",
+                Expression::Ident(ref i) => i.name == "await",
                 _ => false,
             },
             FunctionArg::Pattern(ref p) => match p {
-                Pattern::Identifier(ref i) => i == "await",
+                Pattern::Identifier(ref i) => i.name == "await",
                 _ => false,
             },
         }
@@ -699,8 +712,8 @@ impl FunctionArg {
         FunctionArg::Pattern(patt)
     }
 
-    pub fn ident(name: &str) -> Self {
-        FunctionArg::Pattern(Pattern::ident(name))
+    pub fn ident(name: &str, loc: SourceLocation) -> Self {
+        FunctionArg::Pattern(Pattern::ident(name, loc))
     }
 }
 
@@ -896,8 +909,8 @@ impl Expression {
         }
     }
 
-    pub fn ident(name: &str) -> Self {
-        Expression::Ident(name.to_string())
+    pub fn ident(name: &str, loc: SourceLocation) -> Self {
+        Expression::Ident(Identifier::new(name, loc))
     }
 
     pub fn string(val: &str) -> Self {
@@ -933,7 +946,7 @@ impl Expression {
     }
 
     pub fn function(
-        id: Option<String>,
+        id: Option<Identifier>,
         params: Vec<FunctionArg>,
         body: FunctionBody,
         generator: bool,
@@ -974,11 +987,11 @@ impl ObjectProperty {
         ObjectProperty::Spread(Box::new(arg))
     }
 
-    pub fn string(key: &str, value: &str) -> Self {
+    pub fn string(key: Identifier, value: &str) -> Self {
         ObjectProperty::Property(Property::string(key, value))
     }
 
-    pub fn number(key: &str, value: &str) -> Self {
+    pub fn number(key: Identifier, value: &str) -> Self {
         ObjectProperty::Property(Property::number(key, value))
     }
 }
@@ -993,9 +1006,9 @@ pub struct Property {
 }
 
 impl Property {
-    pub fn string(key: &str, value: &str) -> Self {
+    pub fn string(key: Identifier, value: &str) -> Self {
         Self {
-            key: PropertyKey::Ident(key.to_string()),
+            key: PropertyKey::Ident(key),
             value: PropertyValue::Expr(Expression::string(value)),
             kind: PropertyKind::Init,
             method: false,
@@ -1004,9 +1017,9 @@ impl Property {
         }
     }
 
-    pub fn number(key: &str, value: &str) -> Self {
+    pub fn number(key: Identifier, value: &str) -> Self {
         Self {
-            key: PropertyKey::Ident(key.to_string()),
+            key: PropertyKey::Ident(key),
             value: PropertyValue::Expr(Expression::number(value)),
             kind: PropertyKind::Init,
             method: false,
@@ -1030,9 +1043,9 @@ impl PropertyKey {
                 Literal::String(ref s) => s == other,
                 _ => false,
             },
-            PropertyKey::Ident(ref i) => i == other,
+            PropertyKey::Ident(ref i) => i.name == other,
             PropertyKey::Pattern(ref p) => match p {
-                Pattern::Identifier(ref i) => i == other,
+                Pattern::Identifier(ref i) => i.name == other,
                 _ => false,
             },
         }
@@ -1044,9 +1057,9 @@ impl PropertyKey {
                 Literal::String(ref s) => s == "static",
                 _ => false,
             },
-            PropertyKey::Ident(ref s) => s == "static",
+            PropertyKey::Ident(ref s) => s.name == "static",
             PropertyKey::Pattern(ref p) => match p {
-                Pattern::Identifier(ref s) => s == "static",
+                Pattern::Identifier(ref s) => s.name == "static",
                 _ => false,
             },
         }
@@ -1119,7 +1132,7 @@ impl Pattern {
 
     pub fn is_yield(&self) -> bool {
         match self {
-            Pattern::Identifier(ref ident) => ident == "yield",
+            Pattern::Identifier(ref ident) => ident.name == "yield",
             _ => false,
         }
     }
@@ -1133,13 +1146,13 @@ impl Pattern {
 
     pub fn is_restricted(&self) -> bool {
         match self {
-            Pattern::Identifier(ref ident) => ident == "eval" || ident == "arguments",
+            Pattern::Identifier(ref ident) => ident.name == "eval" || ident.name == "arguments",
             _ => false,
         }
     }
 
-    pub fn ident(name: &str) -> Self {
-        Pattern::Identifier(name.to_string())
+    pub fn ident(name: &str, loc: SourceLocation) -> Self {
+        Pattern::Identifier(Identifier::new(name, loc))
     }
 
     pub fn rest_element(arg: Pattern) -> Self {
@@ -1159,11 +1172,11 @@ impl ObjectPatternPart {
         ObjectPatternPart::Rest(Box::new(arg))
     }
 
-    pub fn string(key: &str, value: &str) -> Self {
+    pub fn string(key: Identifier, value: &str) -> Self {
         ObjectPatternPart::Assignment(Property::string(key, value))
     }
 
-    pub fn number(key: &str, value: &str) -> Self {
+    pub fn number(key: Identifier, value: &str) -> Self {
         ObjectPatternPart::Assignment(Property::number(key, value))
     }
 }
@@ -1588,12 +1601,9 @@ pub struct Class {
 }
 
 impl Class {
-    pub fn new(id: Option<&str>, super_class: Option<Expression>, body: Vec<Property>) -> Self {
+    pub fn new(id: Option<Identifier>, super_class: Option<Expression>, body: Vec<Property>) -> Self {
         Self {
-            id: match id {
-                Some(s) => Some(s.to_string()),
-                None => None,
-            },
+            id,
             super_class: match super_class {
                 Some(e) => Some(Box::new(e)),
                 None => None,
@@ -1602,9 +1612,9 @@ impl Class {
         }
     }
 
-    pub fn no_super(id: &str, body: Vec<Property>) -> Self {
+    pub fn no_super(id: Identifier, body: Vec<Property>) -> Self {
         Self {
-            id: Some(id.to_string()),
+            id: Some(id),
             super_class: None,
             body,
         }
@@ -1629,9 +1639,9 @@ pub struct MethodDef {
 }
 
 impl MethodDef {
-    pub fn constructor(value: Expression) -> Self {
+    pub fn constructor(key_loc: SourceLocation, value: Expression) -> Self {
         Self {
-            key: Expression::Ident("constructor".to_string()),
+            key: Expression::Ident(Identifier::new("constructor", key_loc)),
             value,
             kind: MethodKind::Constructor,
             computed: false,
@@ -1639,9 +1649,9 @@ impl MethodDef {
         }
     }
 
-    pub fn normal(key: &str, value: Expression) -> Self {
+    pub fn normal(key: Identifier, value: Expression) -> Self {
         Self {
-            key: Expression::Ident(key.to_string()),
+            key: Expression::Ident(key),
             value,
             kind: MethodKind::Method,
             computed: false,
@@ -1649,9 +1659,9 @@ impl MethodDef {
         }
     }
 
-    pub fn static_method(key: &str, value: Expression) -> Self {
+    pub fn static_method(key: Identifier, value: Expression) -> Self {
         Self {
-            key: Expression::Ident(key.to_string()),
+            key: Expression::Ident(key),
             value,
             kind: MethodKind::Method,
             computed: false,
@@ -1659,9 +1669,9 @@ impl MethodDef {
         }
     }
 
-    pub fn getter(key: &str, value: Expression) -> Self {
+    pub fn getter(key: Identifier, value: Expression) -> Self {
         Self {
-            key: Expression::Ident(key.to_string()),
+            key: Expression::Ident(key),
             value,
             kind: MethodKind::Get,
             computed: false,
@@ -1669,9 +1679,9 @@ impl MethodDef {
         }
     }
 
-    pub fn setter(key: &str, value: Expression) -> Self {
+    pub fn setter(key: Identifier, value: Expression) -> Self {
         Self {
-            key: Expression::Ident(key.to_string()),
+            key: Expression::Ident(key),
             value,
             kind: MethodKind::Set,
             computed: false,
@@ -1695,10 +1705,10 @@ pub struct MetaProperty {
 }
 
 impl MetaProperty {
-    pub fn new(meta: &str, property: &str) -> Self {
+    pub fn new(meta: Identifier, property: Identifier) -> Self {
         Self {
-            meta: meta.to_string(),
-            property: property.to_string(),
+            meta,
+            property
         }
     }
 }
