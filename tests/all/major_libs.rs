@@ -40,11 +40,11 @@ fn moment() {
     run_test("moment", normal, min);
 }
 
-// #[test]
-// fn dexie() {
-//     let (normal, min) = get_js(Lib::Dexie).expect("Unable to get dexie js");
-//     run_test("dexie", normal, min);
-// }
+#[test]
+fn dexie() {
+    let (normal, min) = get_js(Lib::Dexie).expect("Unable to get dexie js");
+    run_test("dexie", normal, min);
+}
 
 fn run_test(name: &str, normal: String, min: String) {
     let _ = env_logger::try_init();
